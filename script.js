@@ -70,7 +70,6 @@ class SongoEngine {
     return player === 1 ? 7 : 0;
   }
 
-  // Cette fonction génère les étapes théoriques du coup
   playMove(startIndex) {
     this.alertMessage = "";
     if (!this.isValidMove(startIndex)) return null;
@@ -233,7 +232,6 @@ let myRole = 1;
 let currentRoomCode = "";
 let isAnimating = false;
 
-// FONCTION DE PAUSE CRUCIALE (Création du Sleep personnalisé)
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const mainMenu = document.getElementById("main-menu");
@@ -270,7 +268,6 @@ function playSound(type) {
   }
 }
 
-// MISE À JOUR VISUELLE DES GRAINES DANS UNE CASE PRÉCISE
 function updatePitGraphics(pitIndex, targetCount) {
   const pitElement = document.querySelector(`[data-index="${pitIndex}"]`);
   if (!pitElement) return;
@@ -289,7 +286,7 @@ function updatePitGraphics(pitIndex, targetCount) {
   }
 }
 
-// RECEPTION DU TOUR DE L'ADVERSAIRE : EXECUTION AU RALENTI AVEC SLEEP / AWAIT
+// FIX : Réception du tour adverse et correction du blocage Joueur 2
 async function fetchGameState() {
   if (!isOnlineMode || !currentRoomCode || isAnimating) return;
   try {
@@ -300,10 +297,12 @@ async function fetchGameState() {
     if (serverData.status === "error") return;
 
     const serverCurrentPlayer = parseInt(serverData.currentPlayer);
+    
+    // Si le serveur a enregistré un changement de plateau provoqué par l'adversaire
     const boardChanged =
       JSON.stringify(game.board) !== JSON.stringify(serverData.board);
 
-    if (boardChanged) {
+    if (boardChanged && serverCurrentPlayer === parseInt(myRole)) {
       let opponentStartIndex = -1;
       let oppStart = serverCurrentPlayer === 1 ? 7 : 0;
       let oppEnd = serverCurrentPlayer === 1 ? 13 : 6;
@@ -319,7 +318,6 @@ async function fetchGameState() {
         isAnimating = true;
         pits.forEach((p) => p.classList.add("disabled"));
 
-        // Vider visuellement la case de départ cliquée par l'adversaire
         updatePitGraphics(opponentStartIndex, 0);
 
         let tempEngine = new SongoEngine();
@@ -341,11 +339,8 @@ async function fetchGameState() {
               playSound("capture");
             }
 
-            // Rafraîchir uniquement les cases modifiées à cette étape précise
             updatePitGraphics(step.index, step.boardState[step.index]);
-
-            // SUSPENDRE l'exécution pendant 400ms pour voir le déplacement !
-            await sleep(400);
+            await sleep(350);
             currentPit.classList.remove("sowing", "captured-anim");
           }
         }
@@ -435,7 +430,7 @@ function updateUI() {
   scoreP2.textContent = game.scores.p2;
 }
 
-// ACTION AU CLIC : EXECUTION AU RALENTI AVEC AWAIT ET SLEEP
+// FIX : L'incrémentation visuelle progressive fonctionne maintenant sans rester bloquée à 5
 async function handlePitClick(e) {
   if (isAnimating) return;
   const idx = parseInt(e.currentTarget.dataset.index);
@@ -445,7 +440,6 @@ async function handlePitClick(e) {
   isAnimating = true;
   pits.forEach((p) => p.classList.add("disabled"));
 
-  // On vide visuellement la case de départ immédiatement
   updatePitGraphics(idx, 0);
 
   const steps = game.playMove(idx);
@@ -455,7 +449,6 @@ async function handlePitClick(e) {
     return;
   }
 
-  // Boucle asynchrone progressive (Remplace l'exécution instantanée)
   for (let step of steps) {
     const currentPit = document.querySelector(`[data-index="${step.index}"]`);
     if (step.type === "sow") {
@@ -466,16 +459,11 @@ async function handlePitClick(e) {
       playSound("capture");
     }
 
-    // On met à jour l'état visuel de la case ciblée à cette étape précise
     updatePitGraphics(step.index, step.boardState[step.index]);
-
-    // METTRE LE CODE EN PAUSE (Ralenti de 400ms par graine distribuée)
     await sleep(350);
-
     currentPit.classList.remove("sowing", "captured-anim");
   }
 
-  // On notifie le serveur seulement après la fin visuelle de l'action
   if (isOnlineMode) {
     await sendNewStateToServer();
   }
@@ -484,7 +472,6 @@ async function handlePitClick(e) {
   updateUI();
 }
 
-// GESTION DES BOUTONS DE MENU
 document.getElementById("btn-mode-local").addEventListener("click", () => {
   isOnlineMode = false;
   myRole = 1;
@@ -495,32 +482,27 @@ document.getElementById("btn-mode-local").addEventListener("click", () => {
 });
 
 document
-  .getElementById("btn-create-distant")
-  .addEventListener("click", async () => {
+  .getElementById("btn-create-distant").addEventListener("click", async () => {
     isOnlineMode = true;
     try {
       const response = await fetch("server.php?action=create");
       const data = await response.json();
       currentRoomCode = data.roomCode;
-      myRole = parseInt(game.currentPlayer);
+      myRole = 1;
 
       roomDisplay.textContent = `CODE : ${currentRoomCode} (Joueur 1)`;
       mainMenu.classList.add("hidden");
       gameInterface.classList.remove("hidden");
       updateUI();
-      setInterval(fetchGameState, 400);
+      setInterval(fetchGameState, 500);
     } catch (e) {
       alert("Erreur réseau.");
     }
   });
 
 document
-  .getElementById("btn-join-distant")
-  .addEventListener("click", async () => {
-    const codeInput = document
-      .getElementById("input-room-code")
-      .value.trim()
-      .toUpperCase();
+  .getElementById("btn-join-distant").addEventListener("click", async () => {
+    const codeInput = document.getElementById("input-room-code").value.trim().toUpperCase();
     if (codeInput.length !== 5) {
       alert("Code invalide.");
       return;
@@ -547,7 +529,7 @@ document
       game.currentPlayer = parseInt(data.state.currentPlayer);
 
       updateUI();
-      setInterval(fetchGameState, 400);
+      setInterval(fetchGameState, 500);
     } catch (e) {
       alert("Impossible de rejoindre.");
     }
