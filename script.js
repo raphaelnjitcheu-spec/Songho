@@ -286,26 +286,23 @@ function updatePitGraphics(pitIndex, targetCount) {
   }
 }
 
-// FIX : Réception du tour adverse et correction du blocage Joueur 2
+// CORRECTION : Écoute et exécution stricte du tour de l'adversaire en réseau
 async function fetchGameState() {
   if (!isOnlineMode || !currentRoomCode || isAnimating) return;
   try {
-    const response = await fetch(
-      `server.php?room=${currentRoomCode}&t=${Date.now()}`,
-    );
+    const response = await fetch(`server.php?room=${currentRoomCode}&t=${Date.now()}`);
     const serverData = await response.json();
     if (serverData.status === "error") return;
 
     const serverCurrentPlayer = parseInt(serverData.currentPlayer);
-    
-    // Si le serveur a enregistré un changement de plateau provoqué par l'adversaire
-    const boardChanged =
-      JSON.stringify(game.board) !== JSON.stringify(serverData.board);
+    const boardChanged = JSON.stringify(game.board) !== JSON.stringify(serverData.board);
 
+    // Si c'est à mon tour de jouer et que le plateau a changé, l'adversaire vient de jouer
     if (boardChanged && serverCurrentPlayer === parseInt(myRole)) {
       let opponentStartIndex = -1;
-      let oppStart = serverCurrentPlayer === 1 ? 7 : 0;
-      let oppEnd = serverCurrentPlayer === 1 ? 13 : 6;
+      // Identifier la case vidée par l'adversaire (Joueur 1 = cases 0-6, Joueur 2 = cases 7-13)
+      let oppStart = parseInt(myRole) === 1 ? 7 : 0;
+      let oppEnd = parseInt(myRole) === 1 ? 13 : 6;
 
       for (let i = oppStart; i <= oppEnd; i++) {
         if (game.board[i] > 0 && serverData.board[i] === 0) {
@@ -320,17 +317,16 @@ async function fetchGameState() {
 
         updatePitGraphics(opponentStartIndex, 0);
 
+        // Simulation locale temporaire pour l'animation visuelle pas-à-pas
         let tempEngine = new SongoEngine();
         tempEngine.board = [...game.board];
         tempEngine.scores = { ...game.scores };
-        tempEngine.currentPlayer = serverCurrentPlayer === 1 ? 2 : 1;
+        tempEngine.currentPlayer = parseInt(myRole) === 1 ? 2 : 1;
 
         const steps = tempEngine.playMove(opponentStartIndex);
         if (steps) {
           for (let step of steps) {
-            const currentPit = document.querySelector(
-              `[data-index="${step.index}"]`,
-            );
+            const currentPit = document.querySelector(`[data-index="${step.index}"]`);
             if (step.type === "sow") {
               currentPit.classList.add("sowing");
               playSound("sow");
@@ -348,6 +344,7 @@ async function fetchGameState() {
       }
     }
 
+    // Mise à jour finale des états réels du jeu
     game.board = serverData.board;
     game.scores = serverData.scores;
     game.currentPlayer = serverCurrentPlayer;
@@ -375,8 +372,7 @@ async function sendNewStateToServer() {
         currentPlayer: parseInt(game.currentPlayer),
         gameOver: game.gameOver,
         endReason: game.endReason,
-        alertMessage: game.alertMessage,
-        playersConnected: { p1: true, p2: true },
+        alertMessage: game.alertMessage
       },
     }),
   });
@@ -384,9 +380,7 @@ async function sendNewStateToServer() {
 
 function updateUI() {
   const localCurrentPlayer = parseInt(game.currentPlayer);
-  const isMyTurn = isOnlineMode
-    ? localCurrentPlayer === parseInt(myRole)
-    : true;
+  const isMyTurn = isOnlineMode ? localCurrentPlayer === parseInt(myRole) : true;
 
   pits.forEach((pit) => {
     const idx = parseInt(pit.dataset.index);
@@ -430,7 +424,7 @@ function updateUI() {
   scoreP2.textContent = game.scores.p2;
 }
 
-// FIX : L'incrémentation visuelle progressive fonctionne maintenant sans rester bloquée à 5
+// CORRECTION : L'incrémentation visuelle affiche désormais l'état réel progressif de chaque case
 async function handlePitClick(e) {
   if (isAnimating) return;
   const idx = parseInt(e.currentTarget.dataset.index);
@@ -459,6 +453,7 @@ async function handlePitClick(e) {
       playSound("capture");
     }
 
+    // Affiche la valeur de l'état séquentiel sauvegardé dans l'étape
     updatePitGraphics(step.index, step.boardState[step.index]);
     await sleep(350);
     currentPit.classList.remove("sowing", "captured-anim");
@@ -481,59 +476,57 @@ document.getElementById("btn-mode-local").addEventListener("click", () => {
   updateUI();
 });
 
-document
-  .getElementById("btn-create-distant").addEventListener("click", async () => {
-    isOnlineMode = true;
-    try {
-      const response = await fetch("server.php?action=create");
-      const data = await response.json();
-      currentRoomCode = data.roomCode;
-      myRole = 1;
+document.getElementById("btn-create-distant").addEventListener("click", async () => {
+  isOnlineMode = true;
+  try {
+    const response = await fetch("server.php?action=create");
+    const data = await response.json();
+    currentRoomCode = data.roomCode;
+    myRole = 1;
 
-      roomDisplay.textContent = `CODE : ${currentRoomCode} (Joueur 1)`;
-      mainMenu.classList.add("hidden");
-      gameInterface.classList.remove("hidden");
-      updateUI();
-      setInterval(fetchGameState, 500);
-    } catch (e) {
-      alert("Erreur réseau.");
-    }
-  });
+    roomDisplay.textContent = `CODE : ${currentRoomCode} (Joueur 1)`;
+    mainMenu.classList.add("hidden");
+    gameInterface.classList.remove("hidden");
+    updateUI();
+    setInterval(fetchGameState, 500);
+  } catch (e) {
+    alert("Erreur réseau.");
+  }
+});
 
-document
-  .getElementById("btn-join-distant").addEventListener("click", async () => {
-    const codeInput = document.getElementById("input-room-code").value.trim().toUpperCase();
-    if (codeInput.length !== 5) {
-      alert("Code invalide.");
+document.getElementById("btn-join-distant").addEventListener("click", async () => {
+  const codeInput = document.getElementById("input-room-code").value.trim().toUpperCase();
+  if (codeInput.length !== 5) {
+    alert("Code invalide.");
+    return;
+  }
+
+  isOnlineMode = true;
+  try {
+    const response = await fetch(`server.php?action=join&room=${codeInput}`);
+    const data = await response.json();
+    if (data.status === "error") {
+      alert(data.message);
       return;
     }
 
-    isOnlineMode = true;
-    try {
-      const response = await fetch(`server.php?action=join&room=${codeInput}`);
-      const data = await response.json();
-      if (data.status === "error") {
-        alert(data.message);
-        return;
-      }
+    currentRoomCode = codeInput;
+    myRole = parseInt(data.role);
 
-      currentRoomCode = codeInput;
-      myRole = parseInt(data.role);
+    roomDisplay.textContent = `CODE : ${currentRoomCode} (Joueur ${myRole})`;
+    mainMenu.classList.add("hidden");
+    gameInterface.classList.remove("hidden");
 
-      roomDisplay.textContent = `CODE : ${currentRoomCode} (Joueur ${myRole})`;
-      mainMenu.classList.add("hidden");
-      gameInterface.classList.remove("hidden");
+    game.board = data.state.board;
+    game.scores = data.state.scores;
+    game.currentPlayer = parseInt(data.state.currentPlayer);
 
-      game.board = data.state.board;
-      game.scores = data.state.scores;
-      game.currentPlayer = parseInt(data.state.currentPlayer);
-
-      updateUI();
-      setInterval(fetchGameState, 500);
-    } catch (e) {
-      alert("Impossible de rejoindre.");
-    }
-  });
+    updateUI();
+    setInterval(fetchGameState, 500);
+  } catch (e) {
+    alert("Impossible de rejoindre.");
+  }
+});
 
 pits.forEach((p) => p.addEventListener("click", handlePitClick));
 
