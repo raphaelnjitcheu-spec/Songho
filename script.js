@@ -171,6 +171,7 @@ class SongoEngine {
 
     this.checkEndGameConditions();
 
+    // Le changement de tour se fait ICI immédiatement dans l'objet
     if (!this.gameOver) {
       this.currentPlayer = this.currentPlayer === 1 ? 2 : 1;
     }
@@ -224,15 +225,13 @@ class SongoEngine {
 }
 
 // ==========================================
-// 2. CONTRÔLEUR D'INTERFACE ET RÉSEAU
+// 2. CONTRÔLEUR D'INTERFACE ET RÉSEAU PAR SALON
 // ==========================================
 const game = new SongoEngine();
 let isOnlineMode = false;
 let myRole = 1;
 let currentRoomCode = "";
-let isAnimating = false;
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let isAnimating = false; // Verrou local global pendant les animations
 
 const mainMenu = document.getElementById("main-menu");
 const gameInterface = document.getElementById("game-interface");
@@ -268,91 +267,34 @@ function playSound(type) {
   }
 }
 
-function updatePitGraphics(pitIndex, targetCount) {
-  const pitElement = document.querySelector(`[data-index="${pitIndex}"]`);
-  if (!pitElement) return;
-
-  pitElement.querySelector(".pit-count").textContent = targetCount;
-
-  const grainDivs = pitElement.querySelectorAll(".graine");
-  if (grainDivs.length !== targetCount) {
-    grainDivs.forEach((g) => g.remove());
-    for (let i = 0; i < Math.min(targetCount, 15); i++) {
-      let g = document.createElement("div");
-      g.classList.add("graine");
-      g.style.transform = `translate(${Math.random() * 6 - 3}px, ${Math.random() * 6 - 3}px)`;
-      pitElement.appendChild(g);
-    }
-  }
-}
-
-// CORRECTION : Écoute et exécution stricte du tour de l'adversaire en réseau
+// ÉCOUTE DU SERVEUR
 async function fetchGameState() {
-  if (!isOnlineMode || !currentRoomCode || isAnimating) return;
+  if (!isOnlineMode || !currentRoomCode || isAnimating) return; // Ne pas écraser pendant qu'on anime un coup local
   try {
-    const response = await fetch(`server.php?room=${currentRoomCode}&t=${Date.now()}`);
+    const response = await fetch(`server.php?room=${currentRoomCode}`);
     const serverData = await response.json();
     if (serverData.status === "error") return;
 
     const serverCurrentPlayer = parseInt(serverData.currentPlayer);
-    const boardChanged = JSON.stringify(game.board) !== JSON.stringify(serverData.board);
+    const localCurrentPlayer = parseInt(game.currentPlayer);
 
-    // Si c'est à mon tour de jouer et que le plateau a changé, l'adversaire vient de jouer
-    if (boardChanged && serverCurrentPlayer === parseInt(myRole)) {
-      let opponentStartIndex = -1;
-      // Identifier la case vidée par l'adversaire (Joueur 1 = cases 0-6, Joueur 2 = cases 7-13)
-      let oppStart = parseInt(myRole) === 1 ? 7 : 0;
-      let oppEnd = parseInt(myRole) === 1 ? 13 : 6;
+    const boardChanged =
+      JSON.stringify(game.board) !== JSON.stringify(serverData.board);
+    const scoreChanged =
+      game.scores.p1 !== serverData.scores.p1 ||
+      game.scores.p2 !== serverData.scores.p2;
+    const turnChanged = localCurrentPlayer !== serverCurrentPlayer;
 
-      for (let i = oppStart; i <= oppEnd; i++) {
-        if (game.board[i] > 0 && serverData.board[i] === 0) {
-          opponentStartIndex = i;
-          break;
-        }
-      }
+    if (turnChanged || boardChanged || scoreChanged || serverData.gameOver) {
+      game.board = serverData.board;
+      game.scores = serverData.scores;
+      game.currentPlayer = serverCurrentPlayer;
+      game.gameOver = serverData.gameOver;
+      game.endReason = serverData.endReason;
+      game.alertMessage = serverData.alertMessage;
 
-      if (opponentStartIndex !== -1) {
-        isAnimating = true;
-        pits.forEach((p) => p.classList.add("disabled"));
-
-        updatePitGraphics(opponentStartIndex, 0);
-
-        // Simulation locale temporaire pour l'animation visuelle pas-à-pas
-        let tempEngine = new SongoEngine();
-        tempEngine.board = [...game.board];
-        tempEngine.scores = { ...game.scores };
-        tempEngine.currentPlayer = parseInt(myRole) === 1 ? 2 : 1;
-
-        const steps = tempEngine.playMove(opponentStartIndex);
-        if (steps) {
-          for (let step of steps) {
-            const currentPit = document.querySelector(`[data-index="${step.index}"]`);
-            if (step.type === "sow") {
-              currentPit.classList.add("sowing");
-              playSound("sow");
-            } else {
-              currentPit.classList.add("captured-anim");
-              playSound("capture");
-            }
-
-            updatePitGraphics(step.index, step.boardState[step.index]);
-            await sleep(350);
-            currentPit.classList.remove("sowing", "captured-anim");
-          }
-        }
-        isAnimating = false;
-      }
+      updateUI();
     }
-
-    // Mise à jour finale des états réels du jeu
-    game.board = serverData.board;
-    game.scores = serverData.scores;
-    game.currentPlayer = serverCurrentPlayer;
-    game.gameOver = serverData.gameOver;
-    game.endReason = serverData.endReason;
-    game.alertMessage = serverData.alertMessage;
-
-    updateUI();
   } catch (e) {
     console.error(e);
   }
@@ -372,19 +314,34 @@ async function sendNewStateToServer() {
         currentPlayer: parseInt(game.currentPlayer),
         gameOver: game.gameOver,
         endReason: game.endReason,
-        alertMessage: game.alertMessage
+        alertMessage: game.alertMessage,
+        playersConnected: { p1: true, p2: true },
       },
     }),
   });
 }
 
 function updateUI() {
-  const localCurrentPlayer = parseInt(game.currentPlayer);
-  const isMyTurn = isOnlineMode ? localCurrentPlayer === parseInt(myRole) : true;
+  const localCurrentPlayer = mountaineerTurn();
+  const isMyTurn = isOnlineMode
+    ? localCurrentPlayer === parseInt(myRole)
+    : true;
 
   pits.forEach((pit) => {
     const idx = parseInt(pit.dataset.index);
-    updatePitGraphics(idx, game.board[idx]);
+    const count = game.board[idx];
+    pit.querySelector(".pit-count").textContent = count;
+
+    const grainDivs = pit.querySelectorAll(".graine");
+    if (grainDivs.length !== count) {
+      grainDivs.forEach((g) => g.remove());
+      for (let i = 0; i < Math.min(count, 15); i++) {
+        let g = document.createElement("div");
+        g.classList.add("graine");
+        g.style.transform = `translate(${Math.random() * 6 - 3}px, ${Math.random() * 6 - 3}px)`;
+        pit.appendChild(g);
+      }
+    }
 
     let isMyCamp =
       (parseInt(myRole) === 1 && idx >= 0 && idx <= 6) ||
@@ -394,6 +351,7 @@ function updateUI() {
         (localCurrentPlayer === 1 && idx >= 0 && idx <= 6) ||
         (localCurrentPlayer === 2 && idx >= 7 && idx <= 13);
 
+    // Si une animation est en cours ou ce n'est pas mon tour, on désactive TOUT
     if (!isAnimating && isMyTurn && isMyCamp && game.isValidMove(idx)) {
       pit.classList.remove("disabled");
     } else {
@@ -414,7 +372,9 @@ function updateUI() {
   } else {
     let msg = `Tour : Joueur ${localCurrentPlayer === 1 ? "1 (Sud)" : "2 (Nord)"}`;
     if (isOnlineMode) {
-      msg = isMyTurn ? `À vous de jouer !` : `Attente de l'adversaire...`;
+      msg = isMyTurn
+        ? `À vous de jouer ! (${msg})`
+        : `Attente de l'adversaire... (${msg})`;
     }
     statusBar.textContent = msg;
     statusBar.className = localCurrentPlayer === 1 ? "active-p1" : "active-p2";
@@ -424,17 +384,19 @@ function updateUI() {
   scoreP2.textContent = game.scores.p2;
 }
 
-// CORRECTION : L'incrémentation visuelle affiche désormais l'état réel progressif de chaque case
+function mountaineerTurn() {
+  return parseInt(game.currentPlayer);
+}
+
 async function handlePitClick(e) {
   if (isAnimating) return;
   const idx = parseInt(e.currentTarget.dataset.index);
 
-  if (isOnlineMode && parseInt(game.currentPlayer) !== parseInt(myRole)) return;
+  if (isOnlineMode && mountaineerTurn() !== parseInt(myRole)) return;
 
   isAnimating = true;
+  // Désactivation visuelle totale immédiate
   pits.forEach((p) => p.classList.add("disabled"));
-
-  updatePitGraphics(idx, 0);
 
   const steps = game.playMove(idx);
   if (!steps) {
@@ -443,6 +405,13 @@ async function handlePitClick(e) {
     return;
   }
 
+  // CRITIQUE : On synchronise le changement de tour vers le serveur AVANT de lancer l'animation visuelle locale.
+  // De cette façon, le joueur adverse voit son écran se débloquer instantanément sans attendre la fin des transitions du joueur 1.
+  if (isOnlineMode) {
+    await sendNewStateToServer();
+  }
+
+  // Lancement des animations visuelles chez le joueur actif
   for (let step of steps) {
     const currentPit = document.querySelector(`[data-index="${step.index}"]`);
     if (step.type === "sow") {
@@ -453,20 +422,21 @@ async function handlePitClick(e) {
       playSound("capture");
     }
 
-    // Affiche la valeur de l'état séquentiel sauvegardé dans l'étape
-    updatePitGraphics(step.index, step.boardState[step.index]);
-    await sleep(350);
-    currentPit.classList.remove("sowing", "captured-anim");
-  }
+    // On applique l'état de l'étape visuellement
+    document.querySelectorAll(".pit").forEach((p) => {
+      const id = parseInt(p.dataset.index);
+      p.querySelector(".pit-count").textContent = step.boardState[id];
+    });
 
-  if (isOnlineMode) {
-    await sendNewStateToServer();
+    await new Promise((r) => setTimeout(r, 220));
+    currentPit.classList.remove("sowing", "captured-anim");
   }
 
   isAnimating = false;
   updateUI();
 }
 
+// ÉVÉNEMENTS DES BOUTONS DE MENU
 document.getElementById("btn-mode-local").addEventListener("click", () => {
   isOnlineMode = false;
   myRole = 1;
@@ -476,57 +446,64 @@ document.getElementById("btn-mode-local").addEventListener("click", () => {
   updateUI();
 });
 
-document.getElementById("btn-create-distant").addEventListener("click", async () => {
-  isOnlineMode = true;
-  try {
-    const response = await fetch("server.php?action=create");
-    const data = await response.json();
-    currentRoomCode = data.roomCode;
-    myRole = 1;
+document
+  .getElementById("btn-create-distant")
+  .addEventListener("click", async () => {
+    isOnlineMode = true;
+    try {
+      const response = await fetch("server.php?action=create");
+      const data = await response.json();
+      currentRoomCode = data.roomCode;
+      myRole = mountaineerTurn();
 
-    roomDisplay.textContent = `CODE : ${currentRoomCode} (Joueur 1)`;
-    mainMenu.classList.add("hidden");
-    gameInterface.classList.remove("hidden");
-    updateUI();
-    setInterval(fetchGameState, 500);
-  } catch (e) {
-    alert("Erreur réseau.");
-  }
-});
+      roomDisplay.textContent = `CODE DU SALON : ${currentRoomCode} (Vous êtes Joueur 1)`;
+      mainMenu.classList.add("hidden");
+      gameInterface.classList.remove("hidden");
+      updateUI();
+      setInterval(fetchGameState, 400); // Cadence d'écoute accrue à 400ms pour éliminer toute latence
+    } catch (e) {
+      alert("Erreur réseau lors de la création.");
+    }
+  });
 
-document.getElementById("btn-join-distant").addEventListener("click", async () => {
-  const codeInput = document.getElementById("input-room-code").value.trim().toUpperCase();
-  if (codeInput.length !== 5) {
-    alert("Code invalide.");
-    return;
-  }
-
-  isOnlineMode = true;
-  try {
-    const response = await fetch(`server.php?action=join&room=${codeInput}`);
-    const data = await response.json();
-    if (data.status === "error") {
-      alert(data.message);
+document
+  .getElementById("btn-join-distant")
+  .addEventListener("click", async () => {
+    const codeInput = document
+      .getElementById("input-room-code")
+      .value.trim()
+      .toUpperCase();
+    if (codeInput.length !== 5) {
+      alert("Le code doit comporter 5 caractères.");
       return;
     }
 
-    currentRoomCode = codeInput;
-    myRole = parseInt(data.role);
+    isOnlineMode = true;
+    try {
+      const response = await fetch(`server.php?action=join&room=${codeInput}`);
+      const data = await response.json();
+      if (data.status === "error") {
+        alert(data.message);
+        return;
+      }
 
-    roomDisplay.textContent = `CODE : ${currentRoomCode} (Joueur ${myRole})`;
-    mainMenu.classList.add("hidden");
-    gameInterface.classList.remove("hidden");
+      currentRoomCode = codeInput;
+      myRole = parseInt(data.role);
 
-    game.board = data.state.board;
-    game.scores = data.state.scores;
-    game.currentPlayer = parseInt(data.state.currentPlayer);
+      roomDisplay.textContent = `CODE DU SALON : ${currentRoomCode} (Vous êtes Joueur ${myRole === 0 ? "Spectateur" : myRole})`;
+      mainMenu.classList.add("hidden");
+      gameInterface.classList.remove("hidden");
 
-    updateUI();
-    setInterval(fetchGameState, 500);
-  } catch (e) {
-    alert("Impossible de rejoindre.");
-  }
-});
+      game.board = data.state.board;
+      game.scores = data.state.scores;
+      game.currentPlayer = parseInt(data.state.currentPlayer);
+
+      updateUI();
+      setInterval(fetchGameState, 400);
+    } catch (e) {
+      alert("Impossible de rejoindre le salon.");
+    }
+  });
 
 pits.forEach((p) => p.addEventListener("click", handlePitClick));
 
