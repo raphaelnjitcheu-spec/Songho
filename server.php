@@ -1,9 +1,8 @@
 <?php
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Cache-Control: no-cache, must-revalidate');
 
-$roomsDir = __DIR__ . '/rooms/';
+$roomsDir = 'rooms/';
 if (!is_dir($roomsDir)) {
     mkdir($roomsDir, 0777, true);
 }
@@ -44,12 +43,17 @@ if ($action === 'join') {
     }
     
     $state = json_decode(file_get_contents($filePath), true);
+    $role = 0; 
     
-    if (!$state['playersConnected']['p2']) {
+    if (!$state['playersConnected']['p1']) {
+        $state['playersConnected']['p1'] = true;
+        $role = 1;
+    } elseif (!$state['playersConnected']['p2']) {
         $state['playersConnected']['p2'] = true;
         $role = 2;
     } else {
-        $role = 2; 
+        // Déjà deux joueurs ? Le second joueur se reconnecte ou garde son rôle
+        $role = 2;
     }
     
     file_put_contents($filePath, json_encode($state));
