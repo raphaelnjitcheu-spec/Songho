@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: songo-game
+    runtime: php
+    repo: https://github.com/VOTRE_PSEUDO_GITHUB/VOTRE_DEPOT
+    plan: free

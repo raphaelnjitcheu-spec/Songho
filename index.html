@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Songo Pro - Menu Principal</title>
+    <link rel="stylesheet" href="songo1.css">
+</head>
+
+<body>
+
+    <div id="main-menu" class="menu-overlay">
+        <div class="menu-card">
+            <h2>Sélectionner le mode</h2>
+            <button class="menu-btn" id="btn-mode-local">Option 1 : Version Simple</button>
+            <div style="border-top: 1px dashed #5c3a21; margin: 20px 0;"></div>
+
+            <button class="menu-btn" id="btn-create-distant">Option 2 : distant en local </button>
+
+            <div style="margin: 15px 0;">
+                <input type="text" id="input-room-code" placeholder="Code à 5 lettres" maxlength="5" style="padding: 12px; font-size: 1.1rem; text-transform: uppercase; border-radius: 10px; border: 2px solid #5c3a21; background: #0f0a06; color: #fff; text-align: center; width: 80%;">
+                <button class="menu-btn" id="btn-join-distant" style="margin-top: 10px; background: #24140b;">Rejoindre via le Code</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-interface" class="hidden">
+        <div class="game-header">
+            <h1>JEUX DU SONGHO</h1>
+            <div id="room-display" style="color: #ffcc00; font-weight: bold; margin-bottom: 10px; font-size: 1.1rem;"></div>
+            <div id="status-bar" class="active-p1">Chargement...</div>
+            <div id="game-alert" class="alert-hidden"></div>
+        </div>
+
+        <div id="game-container">
+            <div class="score-board p2-card">
+                <div class="player-name">Joueur 2 (Nord)</div>
+                <div id="score-p2" class="score-val">0</div>
+                <div class="score-max">/ 40</div>
+            </div>
+
+            <div id="board">
+                <div class="row" id="row-player2">
+                    <div class="pit player2-pit" data-index="13"><span class="pit-label">G</span><span class="pit-count"></span></div>
+                    <div class="pit player2-pit" data-index="12"><span class="pit-label">F</span><span class="pit-count"></span></div>
+                    <div class="pit player2-pit" data-index="11"><span class="pit-label">E</span><span class="pit-count"></span></div>
+                    <div class="pit player2-pit" data-index="10"><span class="pit-label">D</span><span class="pit-count"></span></div>
+                    <div class="pit player2-pit" data-index="9"><span class="pit-label">C</span><span class="pit-count"></span></div>
+                    <div class="pit player2-pit" data-index="8"><span class="pit-label">B</span><span class="pit-count"></span></div>
+                    <div class="pit player2-pit" data-index="7" id="pit-prot-p2"><span class="pit-label">A★</span><span class="pit-count"></span></div>
+                </div>
+
+                <div class="center-line"></div>
+
+                <div class="row" id="row-player1">
+                    <div class="pit player1-pit" data-index="0" id="pit-prot-p1"><span class="pit-label">1★</span><span class="pit-count"></span></div>
+                    <div class="pit player1-pit" data-index="1"><span class="pit-label">2</span><span class="pit-count"></span></div>
+                    <div class="pit player1-pit" data-index="2"><span class="pit-label">3</span><span class="pit-count"></span></div>
+                    <div class="pit player1-pit" data-index="3"><span class="pit-label">4</span><span class="pit-count"></span></div>
+                    <div class="pit player1-pit" data-index="4"><span class="pit-label">5</span><span class="pit-count"></span></div>
+                    <div class="pit player1-pit" data-index="5"><span class="pit-label">6</span><span class="pit-count"></span></div>
+                    <div class="pit player1-pit" data-index="6"><span class="pit-label">7</span><span class="pit-count"></span></div>
+                </div>
+            </div>
+
+            <div class="score-board p1-card">
+                <div class="player-name">Joueur 1 (Sud)</div>
+                <div id="score-p1" class="score-val">0</div>
+                <div class="score-max">/ 40</div>
+            </div>
+        </div>
+
+        <button id="btn-reset">Réinitialiser la partie</button>
+    </div>
+
+    <script src="script.js?v=3.0"></script>
+
+</body>
+
+</html>

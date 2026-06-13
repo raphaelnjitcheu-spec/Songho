@@ -1,0 +1,327 @@
+:root {
+    --bg-dark: #0f0a06;
+    --wood-light: #3d2314;
+    --wood-dark: #24140b;
+    --accent-p1: #00ffcc;
+    --accent-p2: #ff3366;
+    --graine: linear-gradient(135deg, #ffcc66, #d4af37);
+    --gold: #ffcc00;
+}
+
+/* Réinitialisation stricte pour couper les marges parasites des navigateurs mobiles */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg--gold);
+    background-image: url('rudo.jpg');
+    color: #fff;
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center; /* Centrage vertical total */
+    overflow: hidden; /* Bloque absolument tous les défilements (X et Y) sur mobile */
+    padding: 10px;*/
+}
+
+/* Menu principal */
+.menu-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 10, 6, 0.98);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 20px;
+}
+
+.menu-card {
+    background: linear-gradient(135deg, var(--wood-dark), #140a05);
+    padding: 30px 20px;
+    border-radius: 20px;
+    border: 3px solid #5c3a21;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8);
+    text-align: center;
+    max-width: 380px;
+    width: 100%;
+}
+
+.menu-card h2 {
+    color: var(--gold);
+    margin-bottom: 25px;
+    font-size: 1.4rem;
+}
+
+.menu-btn {
+    display: block;
+    width: 100%;
+    background: linear-gradient(to bottom, #5c3a21, #3d2314);
+    color: #fff;
+    border: 2px solid #7c5232;
+    padding: 12px;
+    font-size: 0.95rem;
+    font-weight: bold;
+    border-radius: 12px;
+    cursor: pointer;
+    margin-bottom: 12px;
+}
+
+/* Interface de jeu globale */
+#game-interface {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* En-tête */
+.game-header {
+    text-align: center;
+    margin-bottom: 10px;
+    width: 100%;
+}
+
+.game-header h1 {
+    font-size: 1.3rem;
+    letter-spacing: 1px;
+    color: var(--gold);
+    margin-bottom: 4px;
+}
+
+#status-bar {
+    font-size: 0.85rem;
+    padding: 5px 14px;
+    border-radius: 20px;
+    display: inline-block;
+    font-weight: bold;
+}
+
+.active-p1 {
+    background: rgba(0, 255, 204, 0.12);
+    color: var(--accent-p1);
+    border: 1px solid var(--accent-p1);
+}
+
+.active-p2 {
+    background: rgba(255, 51, 102, 0.12);
+    color: var(--accent-p2);
+    border: 1px solid var(--accent-p2);
+}
+
+#game-alert {
+    margin-top: 3px;
+    font-weight: bold;
+    color: #ff3366;
+    min-height: 18px;
+    font-size: 0.8rem;
+}
+
+.alert-hidden {
+    visibility: hidden;
+}
+
+/* Conteneur de structure du jeu */
+#game-container {
+    display: flex;
+    flex-direction: column; /* Organisation verticale par défaut pour mobile */
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+/* Tableaux des scores */
+.score-board {
+    background: #140a05;
+    padding: 6px 12px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1.5px solid #3d2314;
+    width: 100%;
+    max-width: 240px; /* Aligné pour éviter les extensions d'écran */
+}
+
+.p1-card { border-left: 4px solid var(--accent-p1); }
+.p2-card { border-left: 4px solid var(--accent-p2); }
+
+.player-name {
+    font-weight: bold;
+    font-size: 0.8rem;
+    color: #ccc;
+}
+
+.score-val {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: var(--gold);
+}
+
+/* LE PLATEAU : PARFAITEMENT CENTRÉ, COMPACT ET SÉCURISÉ POUR MOBILE 460PX */
+#board {
+    background: linear-gradient(135deg, var(--wood-dark), #140a05);
+    padding: 10px 6px;
+    border-radius: 16px;
+    border: 3.5px solid #5c3a21;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    
+    width: 94vw; /* S'adapte à la largeur mobile sans jamais dépasser */
+    max-width: 700px; /* Évite qu'il devienne géant sur PC */
+    margin: 0 auto; /* Verrouille le centrage horizontal absolu */
+}
+
+.center-line {
+    height: 1.5px;
+    background: linear-gradient(to right, transparent, #5c3a21, transparent);
+    width: 100%;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr); /* 7 trous parfaitement alignés et égaux */
+    gap: 4px;
+    width: 100%;
+}
+
+/* LES HOLES / TROUS (CIRCULAIRES ET EXTENSIBLES DYNAMIQUEMENT) */
+.pit {
+    aspect-ratio: 1 / 1; /* Reste un cercle parfait, peu importe la réduction */
+    background: radial-gradient(circle at 30% 30%, #140a05, #000);
+    border-radius: 50%;
+    border: 1.5px solid #3d2314;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 2px;
+    -webkit-tap-highlight-color: transparent; /* Désactive la surbrillance bleue au clic sur mobile */
+}
+
+.player1-pit:not(.disabled):hover { border-color: var(--accent-p1); }
+.player2-pit:not(.disabled):hover { border-color: var(--accent-p2); }
+.disabled { cursor: not-allowed; }
+
+/* Libellés de repères sous les trous (1*, 2, etc.) */
+.pit-label {
+    position: absolute;
+    font-size: 0.5rem;
+    color: #666;
+    font-weight: bold;
+    pointer-events: none;
+}
+#row-player1 .pit-label { bottom: -12px; left: 50%; transform: translateX(-50%); }
+#row-player2 .pit-label { top: -12px; left: 50%; transform: translateX(-50%); }
+
+#pit-prot-p1 { border: 1.5px dashed var(--accent-p1); }
+#pit-prot-p2 { border: 1.5px dashed var(--accent-p2); }
+
+/* Compteurs numériques au-dessus des cases */
+.pit-count {
+    position: absolute;
+    font-size: 0.65rem;
+    font-weight: bold;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 0px 3px;
+    border-radius: 4px;
+    z-index: 5;
+    pointer-events: none;
+}
+#row-player1 .pit-count { top: -8px; left: 50%; transform: translateX(-50%); }
+#row-player2 .pit-count { bottom: -8px; left: 50%; transform: translateX(-50%); }
+
+/* LES GRAINES (S'adaptent à la taille de l'écran automatiquement) */
+.graine {
+    width: clamp(3px, 1.2vw, 6px);
+    height: clamp(3px, 1.2vw, 6px);
+    background: var(--graine);
+    border-radius: 50%;
+    box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.7);
+}
+
+/* Boutons */
+#btn-reset {
+    margin-top: 8px;
+    background: #5c1e1e;
+    color: white;
+    border: 1.5px solid #7d2626;
+    padding: 8px 18px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.hidden { display: none !important; }
+
+.sowing {
+    animation: pulse 0.3s infinite alternate;
+}
+@keyframes pulse {
+    0% { box-shadow: inset 0 0 3px rgba(255, 204, 0, 0.3); }
+    100% { box-shadow: inset 0 0 10px rgba(255, 204, 0, 0.7); border-color: var(--gold); }
+}
+
+.captured-anim {
+    animation: flashCapture 0.4s ease-out;
+}
+@keyframes flashCapture {
+    0% { background: rgba(255, 0, 0, 0.5); }
+    100% { background: radial-gradient(circle at 30% 30%, #140a05, #000); }
+}
+
+/* =======================================================
+   ADAPTATION ET COMMUTATION PC ET TABLETTES (LARGEUR > 800PX)
+   ======================================================= */
+@media (min-width: 800px) {
+    body {
+        overflow: auto; /* Permet le scroll uniquement si nécessaire sur ordinateur */
+    }
+    
+    #game-container {
+        flex-direction: row; /* Met les scores sur le côté uniquement si l'écran est large */
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+    }
+    
+    .score-board {
+        flex-direction: column; /* Restructure le bloc de score verticalement sur PC */
+        height: auto;
+        padding: 15px;
+        max-width: 140px;
+    }
+    
+    .game-header h1 {
+        font-size: 1.6rem;
+    }
+    
+    #board {
+        padding: 15px 12px;
+        gap: 12px;
+    }
+    
+    .graine {
+        width: 8px;
+        height: 8px;
+    }
+}
