@@ -3,7 +3,6 @@ header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: no-cache, must-revalidate');
 
-// Utilisation d'un chemin absolu sécurisé pour le Cloud
 $roomsDir = __DIR__ . '/rooms/';
 if (!is_dir($roomsDir)) {
     mkdir($roomsDir, 0777, true);
@@ -50,7 +49,7 @@ if ($action === 'join') {
         $state['playersConnected']['p2'] = true;
         $role = 2;
     } else {
-        $role = 2; // Rôle persistant pour le second invité
+        $role = 2; 
     }
     
     file_put_contents($filePath, json_encode($state));
